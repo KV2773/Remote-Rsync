@@ -1,0 +1,21 @@
+#!/usr/bin/expect -f
+
+# Usage: ./ssh-copy-id-expect.sh <user@host> <path_to_key> <password>
+
+set userHost [lindex $argv 0]
+set keyPath [lindex $argv 1]
+set password [lindex $argv 2]
+
+spawn ssh-copy-id -i $keyPath $userHost
+
+expect {
+    "*yes/no*" {
+        send "yes\r"
+        exp_continue
+    }
+    "*assword:*" {
+        send "$password\r"
+    }
+}
+
+expect eof
