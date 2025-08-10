@@ -9,7 +9,6 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
   "main": "./extension.js",
   "publisher": "Kushal Verma",
   "contributes": {

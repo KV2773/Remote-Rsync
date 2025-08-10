@@ -1,7 +1,12 @@
- code() {
-        FILE="$1"
-        # Expand relative path using shell before passing to Python
-        FILE="$(cd "$(dirname "$FILE")" && pwd)/$(basename "$FILE")"
-        : > ~/.sshfs/command.txt
-        echo "$FILE" >> ~/.sshfs/command.txt
-    }
+code() {
+    FILE="$1"
+
+    # If it's not an absolute path, expand it relative to the current working dir
+    case "$FILE" in
+        /*) ABS="$FILE" ;;  # already absolute
+        *)  ABS="$(cd "$(dirname "$FILE")" && pwd)/$(basename "$FILE")" ;;
+    esac
+
+    : > ~/.sshfs/command.txt
+    echo "$ABS" >> ~/.sshfs/command.txt
+}

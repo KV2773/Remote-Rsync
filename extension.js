@@ -13,6 +13,8 @@ let AIX_USER = '';
 let AIX_HOST = '';
 let mount_dir = '';
 let keyPath = '';
+let config='';
+let Open_files ={};
 
 function activate(context) {
     const terminal = vscode.window.createTerminal('Rsync Mount');
@@ -57,32 +59,38 @@ function activate(context) {
 function watchCommandFile() {
     LOCAL_COMMAND_FILE = path.join(LOCAL_SYNC_DIR, 'command.txt');
     
-    let target = '';
+    
     chokidar.watch(LOCAL_COMMAND_FILE).on('change', () => {
-         target = fs.readFileSync(LOCAL_COMMAND_FILE, 'utf8').trim();
+        const target = fs.readFileSync(LOCAL_COMMAND_FILE, 'utf8').trim();
         if (target) pullFromAix(target);
     });
 
-    vscode.workspace.onDidSaveTextDocument((doc) => {
-    console.log("SAVE EVENT FIRED:", doc.fileName);
-    vscode.window.showInformationMessage(`File saved: ${doc.fileName}. ${syncedFilePath ? 'Syncing...' : ''}`);
+    
 
-});
+    // vscode.workspace.onDidSaveTextDocument((doc) => {
+    //     vscode.window.showInformationMessage(`File saved: ${doc.fileName}. ${syncedFilePath ? 'Syncing...' : ''}`);
+    //     console.log(`File saved: ${doc.fileName}`);
 
-    vscode.workspace.onDidSaveTextDocument((doc) => {
-        vscode.window.showInformationMessage(`File saved: ${doc.fileName}. ${syncedFilePath ? 'Syncing...' : ''}`);
-        console.log(`File saved: ${doc.fileName}`);
-
-        if (syncedFilePath && doc.fileName === syncedFilePath) {
-            console.log(`File ${doc.fileName} is synced, pushing to AIX...`);
-            vscode.window.showInformationMessage(`File saved: ${doc.fileName}`);
-            pushToAix(target);
-        }
-    });
+    //     if (syncedFilePath && doc.fileName === syncedFilePath) {
+    //         console.log(`File ${doc.fileName} is synced, pushing to AIX...`);
+    //         vscode.window.showInformationMessage(`File saved: ${doc.fileName}`);
+    //         pushToAix(target);
+    //     }
+    // });
 }
 
 async function pullFromAix(remotePath) {
     const filename = path.basename(remotePath);
+    if (!Open_files.FILES) {
+    Open_files.FILES = {};
+    }
+    Open_files.FILES[filename] = remotePath;
+
+    Open_files['aix_user'] = AIX_USER;
+    Open_files['aix_host'] = AIX_HOST;
+
+    fs.writeFileSync(mount_dir+'/aix_config.json',JSON.stringify(Open_files,null,2), 'utf8');
+
     const localPath = path.join(mount_dir, filename);
     const remoteFull = `${AIX_USER}@${AIX_HOST}:${remotePath}`;
     const rsyncCmd = `rsync -avz -e "ssh -i ${keyPath}" ${remoteFull} ${mount_dir}`;
@@ -95,19 +103,20 @@ async function pullFromAix(remotePath) {
     }
 }
 
-function pushToAix(filePath) {
-    if (!filePath) return;
-    const remoteTarget = `${AIX_USER}@${AIX_HOST}:${path.basename(filePath)}`;
-    const rsyncCmd = `rsync -avz -e "ssh -i ${keyPath}" "${filePath}" ${remoteTarget}`;
-    exec(rsyncCmd).catch(err => console.error(`Push failed: ${err}`));
-}
+// function pushToAix(filePath) {
+//     if (!filePath) return;
+//     const remoteTarget = `${AIX_USER}@${AIX_HOST}:${path.basename(filePath)}`;
+//     const rsyncCmd = `rsync -avz -e "ssh -i ${keyPath}" "${filePath}" ${remoteTarget}`;
+//     exec(rsyncCmd).catch(err => console.error(`Push failed: ${err}`));
+// }
 
 function saveConfig(context, login) {
     const configPath = vscode.Uri.joinPath(context.globalStorageUri, 'sshfs-config.json').fsPath;
     let logins = [];
     if (fs.existsSync(configPath)) {
-        try { logins = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch {}
+        try { logins = JSON.parse(fs.readFileSync(configPath, 'utf8')); config= logins[0] } catch {}
     }
+    
     if (!logins.includes(login)) logins.push(login);
     fs.mkdirSync(context.globalStorageUri.fsPath, { recursive: true });
     fs.writeFileSync(configPath, JSON.stringify(logins, null, 2));
@@ -179,7 +188,10 @@ async function mountSSHFS(context, value, mount_dir) {
 
                 // Step 5: Open VS Code in mount dir
                 try {
-                    await exec(`code --folder-uri "${mount_dir}"`);
+                    // await exec(`code --folder-uri "${mount_dir}"`);
+                    const helperPath = "/Users/kushalverma/Documents/AIX/Extension/helper";
+                    await exec(`code --extensionDevelopmentPath="${helperPath}" "${mount_dir}"`);
+
                 } catch (err) {
                     vscode.window.showErrorMessage(`Failed to open VS Code in ${mount_dir}`);
                 }
